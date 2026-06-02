@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -64,6 +63,7 @@ if uploaded_file is not None:
         )
 
         chain = prompt | llm
+
         response = chain.invoke({
             "context": context,
             "question": question
