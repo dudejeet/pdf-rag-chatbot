@@ -6,7 +6,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-#from langchain.chains import RetrievalQA
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
@@ -40,21 +40,39 @@ if uploaded_file is not None:
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever,
-        return_source_documents=True
-    )
-
     question = st.text_input("Ask a question about the PDF:")
 
     if question:
-        result = qa_chain.invoke({"query": question})
+        relevant_docs = retriever.invoke(question)
+
+        context = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+        prompt = ChatPromptTemplate.from_template(
+            """
+            You are an AI assistant that answers questions using only the provided PDF context.
+
+            Context:
+            {context}
+
+            Question:
+            {question}
+
+            Answer clearly and accurately based only on the context.
+            If the answer is not found in the context, say:
+            "I could not find that information in the PDF."
+            """
+        )
+
+        chain = prompt | llm
+        response = chain.invoke({
+            "context": context,
+            "question": question
+        })
 
         st.subheader("Answer")
-        st.write(result["result"])
+        st.write(response.content)
 
         st.subheader("Source Chunks")
-        for doc in result["source_documents"]:
+        for doc in relevant_docs:
             st.write(doc.page_content[:500])
             st.write("---")
